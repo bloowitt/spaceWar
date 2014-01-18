@@ -28,14 +28,30 @@ var planetData = {},
     planetCollection = [],
     yPos = [1, 1];
 
+// extend the circle body
+Physics.body('shot', 'circle', function (parent) {
+    return {
+        init: function (options) {
+            var pThis = this;
+            parent.init.call(this, options);
+            this.gameType = 'shot';
+            setTimeout(function () {
+                world.removeBody(pThis);
+            }, 2500);
+            return this;
+        }
+    };
+});
+
+
 // Converts from degrees to radians.
-Math.radians = function(degrees) {
-  return degrees * Math.PI / 180;
+Math.radians = function (degrees) {
+    return degrees * Math.PI / 180;
 };
  
 // Converts from radians to degrees.
-Math.degrees = function(radians) {
-  return radians * 180 / Math.PI;
+Math.degrees = function (radians) {
+    return radians * 180 / Math.PI;
 };
 
 
@@ -128,7 +144,7 @@ function generatePlanets() {
 function shoot(power, angle) {
     var newShoot;
     $("#shootButton").off('click');
-    newShoot = Physics.body('circle', {
+    newShoot = Physics.body('shot', {
         x: playerMargin + playerWidth + (turn * (fieldWidth - 2 * playerWidth - 2 * playerMargin)),
         y: yPos[turn],
         radius: 5,
@@ -137,6 +153,7 @@ function shoot(power, angle) {
         vy: power * Math.sin(angle)
     });
     world.add(newShoot);
+    
     turn = (turn + 1) % 2;
     $("#shootButton").on('click', processShootClick);
 }
