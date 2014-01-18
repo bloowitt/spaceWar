@@ -1,9 +1,17 @@
 <html>
 <head>
 <title>Game try</title>
+    <link rel="stylesheet" href="game.css" type="text/css" />
 </head>
-<body onload="startGame();">
+<body>
     <canvas id="gameCanvas"></canvas>
+    <div id="controller">
+        <label for="angle">Ángulo (º) [-85,+85]:</label>
+        <input type="text" id="angle" value="0" />
+        <label for="power">Potencia: [5-100]:</label>
+        <input type="text" id="power" value="50" />
+        <input type="button" id="shootButton" value="Shoot!" />
+    </div>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script type="text/javascript" src="physicsjs-full-0.5.3.min.js"></script>
     <script type="text/javascript" src="game.js"></script>

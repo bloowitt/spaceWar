@@ -1,0 +1,8 @@
+canvas {
+  background: url(https://raw.github.com/wellcaffeinated/PhysicsJS/ship-demo/examples/spaceship/images/starfield.png) 0 0 repeat;
+}
+
+#controller {
+    width: 900px;
+    text-align: justify;
+}
