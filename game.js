@@ -24,8 +24,8 @@ var planetData = {},
     minPlanXPos = playerWidth + 2 * playerMargin,
     maxPlanXPos = fieldWidth - minPlanXPos,
     planPossibleFieldWidth = maxPlanXPos - minPlanXPos,
-    turn = 1;
-
+    turn = 1,
+    planetCollection = [];
 
 Physics.util.ticker.subscribe(
     function (time, dt) {
@@ -67,6 +67,20 @@ function generatePlayers() {
     world.add(player2);
 }
 
+function collision(xp, yp, rad) {
+    var i,
+        maxRadius,
+        distance,
+        curPlanet;
+    for (i = 0; i < planetCollection.length; i++) {
+        curPlanet = planetCollection[i];
+        maxRadius = Math.max(curPlanet.rad, rad);
+        distance = Math.sqrt(Math.pow((curPlanet.xp - xp), 2) + Math.pow((curPlanet.yp - yp), 2));
+        if (distance <= maxRadius) { return true; }
+    }
+    return false;
+}
+
 function generatePlanets() {
     var i = 0,
         newPlanetXPos,
@@ -78,15 +92,17 @@ function generatePlanets() {
             newPlanetRadius = Math.floor(Math.random() * (maxPlanSize - minPlanSize)) + minPlanSize;
             newPlanetXPos = Math.floor(Math.random() * (planPossibleFieldWidth - newPlanetRadius * 2)) + minPlanXPos + newPlanetRadius;
             newPlanetYPos = Math.floor(Math.random() * (fieldHeight - newPlanetRadius * 2)) + newPlanetRadius;
-            newPlanet = Physics.body('circle', {
-                x: newPlanetXPos,
-                y: newPlanetYPos,
-                radius: newPlanetRadius,
-                fixed: true,
-                mass: newPlanetRadius * 2
-            });
+            
         // TODO detect collision with existing planets
-        } while (false);
+        } while (collision(newPlanetXPos, newPlanetYPos, newPlanetRadius));
+        planetCollection.push({xp: newPlanetXPos, yp: newPlanetYPos, rad: newPlanetRadius});
+        newPlanet = Physics.body('circle', {
+            x: newPlanetXPos,
+            y: newPlanetYPos,
+            radius: newPlanetRadius,
+            fixed: true,
+            mass: newPlanetRadius * 2
+        });
         world.add(newPlanet);
     }
 }
