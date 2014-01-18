@@ -3,7 +3,6 @@
 
 var planetData = {},
     world,
-    newtonianBehaviour = Physics.behaviour('newtonian'),
     fieldWidth = 900,
     fieldHeight = 600,
     renderer = Physics.renderer('canvas', {
@@ -12,6 +11,7 @@ var planetData = {},
         height: fieldHeight,
         meta: false
     }),
+    planetClearance = 5,
     viewportBounds = Physics.aabb(0, 0, 900, 600),
     playerWidth = 80,
     playerMargin = 10,
@@ -24,43 +24,58 @@ var planetData = {},
     minPlanXPos = playerWidth + 2 * playerMargin,
     maxPlanXPos = fieldWidth - minPlanXPos,
     planPossibleFieldWidth = maxPlanXPos - minPlanXPos,
-    turn = 1,
-    planetCollection = [];
+    turn = 0,
+    planetCollection = [],
+    yPos = [1, 1];
+
+// Converts from degrees to radians.
+Math.radians = function(degrees) {
+  return degrees * Math.PI / 180;
+};
+ 
+// Converts from radians to degrees.
+Math.degrees = function(radians) {
+  return radians * 180 / Math.PI;
+};
+
 
 Physics.util.ticker.subscribe(
     function (time, dt) {
         world.step(time);
-        world.render();
     }
 );
 
 
 function generatePlayers() {
-    var yPos1 = Math.floor((Math.random() * (fieldHeight - playerHeight - 2 * playerMargin))) + playerMargin,
-        yPos2 = Math.floor((Math.random() * (fieldHeight - playerHeight - 2 * playerMargin))) + playerMargin,
-        player1,
-        player2;
+    var player1,
+        player2,
+        i;
+    for (i = 0; i < yPos.length; i += 1) {
+        yPos[i] = Math.floor((Math.random() * (fieldHeight - playerHeight - 2 * playerMargin))) + playerMargin;
+    }
     player1 = Physics.body('convex-polygon', {
         x: player1xPos + (playerWidth / 2),
-        y: yPos1 + (playerHeight / 2),
+        y: yPos[0] + (playerHeight / 2),
+        mass: 0.1,
         fixed: true,
         vertices : [
-            { x: player1xPos, y: yPos1 },
-            { x: player1xPos, y: yPos1 + playerHeight },
-            { x: player1xPos  + playerWidth, y: yPos1 + playerHeight },
-            { x:  player1xPos + playerWidth, y: yPos1 }
+            { x: player1xPos, y: yPos[0] },
+            { x: player1xPos, y: yPos[0] + playerHeight },
+            { x: player1xPos  + playerWidth, y: yPos[0] + playerHeight },
+            { x:  player1xPos + playerWidth, y: yPos[0] }
         ]
     });
     player2 = Physics.body('convex-polygon', {
         x: player2xPos + (playerWidth / 2),
-        y: yPos2 + (playerHeight / 2),
+        y: yPos[1] + (playerHeight / 2),
         fixed: true,
         angle: -Math.PI,
+        mass: 0.1,
         vertices : [
-            { x: player2xPos, y: yPos2 },
-            { x: player2xPos, y: yPos2 + playerHeight },
-            { x: player2xPos  + playerWidth, y: yPos2 + playerHeight },
-            { x:  player2xPos + playerWidth, y: yPos2 }
+            { x: player2xPos, y: yPos[1] },
+            { x: player2xPos, y: yPos[1] + playerHeight },
+            { x: player2xPos  + playerWidth, y: yPos[1] + playerHeight },
+            { x:  player2xPos + playerWidth, y: yPos[1] }
         ]
     });
     world.add(player1);
@@ -71,14 +86,17 @@ function collision(xp, yp, rad) {
     var i,
         maxRadius,
         distance,
-        curPlanet;
-    for (i = 0; i < planetCollection.length; i++) {
+        curPlanet,
+        returnValue = false;
+    for (i = 0; i < planetCollection.length; i += 1) {
         curPlanet = planetCollection[i];
-        maxRadius = Math.max(curPlanet.rad, rad);
+        maxRadius = curPlanet.rad + rad + planetClearance;
         distance = Math.sqrt(Math.pow((curPlanet.xp - xp), 2) + Math.pow((curPlanet.yp - yp), 2));
-        if (distance <= maxRadius) { return true; }
+        if (distance <= maxRadius) {
+            returnValue = true;
+        }
     }
-    return false;
+    return returnValue;
 }
 
 function generatePlanets() {
@@ -92,28 +110,54 @@ function generatePlanets() {
             newPlanetRadius = Math.floor(Math.random() * (maxPlanSize - minPlanSize)) + minPlanSize;
             newPlanetXPos = Math.floor(Math.random() * (planPossibleFieldWidth - newPlanetRadius * 2)) + minPlanXPos + newPlanetRadius;
             newPlanetYPos = Math.floor(Math.random() * (fieldHeight - newPlanetRadius * 2)) + newPlanetRadius;
-            
-        // TODO detect collision with existing planets
         } while (collision(newPlanetXPos, newPlanetYPos, newPlanetRadius));
+        
         planetCollection.push({xp: newPlanetXPos, yp: newPlanetYPos, rad: newPlanetRadius});
         newPlanet = Physics.body('circle', {
             x: newPlanetXPos,
             y: newPlanetYPos,
             radius: newPlanetRadius,
             fixed: true,
-            mass: newPlanetRadius * 2
+            mass: newPlanetRadius / 25
         });
         world.add(newPlanet);
     }
 }
 
+
+function shoot(power, angle) {
+    var newShoot;
+    $("#shootButton").off('click');
+    newShoot = Physics.body('circle', {
+        x: playerMargin + playerWidth + (turn * (fieldWidth - 2 * playerWidth - 2 * playerMargin)),
+        y: yPos[turn],
+        radius: 5,
+        mass: 0.5,
+        vx: power * Math.cos(angle) * (1 - turn * 2),
+        vy: power * Math.sin(angle)
+    });
+    world.add(newShoot);
+    turn = (turn + 1) % 2;
+    $("#shootButton").on('click', processShootClick);
+}
+
+function processShootClick() {
+    var shootPower = parseInt($("#power").val(), 10) / 75,
+        shootAngle = - Math.radians(parseInt($("#angle").val(), 10));
+    shoot(shootPower, shootAngle);
+}
+
 function restartGame() {
     Physics.util.ticker.stop();
+    $("#shootButton").off('click');
     if (world) {
         world.destroy();
     }
     world = Physics();
-    world.add(newtonianBehaviour);
+    world.add(Physics.behaviour('newtonian'));
+    world.add(Physics.behaviour('sweep-prune'));
+    world.add(Physics.behaviour('body-collision-detection'));
+    world.add(Physics.behaviour('body-impulse-response'));
     world.add(renderer);
     world.add(Physics.behavior('edge-collision-detection', {
         aabb: viewportBounds,
@@ -125,6 +169,16 @@ function restartGame() {
     generatePlayers();
     generatePlanets();
     Physics.util.ticker.start();
+    $("#shootButton").on('click', processShootClick);
 }
+
+
+
+function redrawGame() {
+    world.render();
+    requestAnimationFrame(redrawGame);
+}
+
+requestAnimationFrame(redrawGame);
 
 restartGame();
