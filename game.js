@@ -35,14 +35,89 @@ Physics.body('shot', 'circle', function (parent) {
             var pThis = this;
             parent.init.call(this, options);
             this.gameType = 'shot';
-            setTimeout(function () {
-                world.removeBody(pThis);
-            }, 2500);
             return this;
+        },
+        destroy: function () {
+            world.removeBody(this);
         }
     };
 });
 
+Physics.body('player', 'convex-polygon', function (parent) {
+    return {
+        init: function (options) {
+            var pThis = this;
+            parent.init.call(this, options);
+            this.gameType = 'player';
+            
+            return this;
+        },
+        destroy: function () {
+            world.removeBody(this);
+        }
+    };
+});
+
+// This should be a behaviour that checks all shots, instead of a behaviour for each
+// and every shot. But what can I do for now!
+Physics.behavior('shot-behaviour', function (parent) {
+    return {
+        init: function (options) {
+            var self = this,
+                shot = self.shot = options.shot;
+            // the shot will be passed in via the config options
+            // so we need to store the shot
+            parent.init.call(this, options);
+            setTimeout(function () {
+                self.destroy();
+            }, 3000);
+        },
+        destroy: function () {
+            this.shot.destroy();
+            world.removeBehavior(this);
+        },
+        connect: function (world) {
+            // we want to subscribe to world events
+            world.subscribe('collisions:detected', this.checkShotCollision, this);
+            world.subscribe('integrate:positions', this.behave, this);
+        },
+        disconnect: function (world) {
+            // we want to unsubscribe from world events
+            world.unsubscribe('collisions:detected', this.checkPlayerCollision);
+            world.unsubscribe('integrate:positions', this.behave);
+        },
+        checkShotCollision: function (data) {
+            var self = this,
+                world = self._world,
+                collisions = data.collisions,
+                col,
+                i,
+                l,
+                player = this.player;
+
+            for (i = 0, l = collisions.length; i < l; i += 1) {
+                col = collisions[i];
+
+                // if one of these bodies is our shoot...
+                if (col.bodyA === self.shot || col.bodyB === self.shot) {
+                    if (col.bodyA.gameType === "player") {
+                        col.bodyA.destroy();
+                    }
+                    if (col.bodyB.gameType === "player") {
+                        col.bodyB.destroy();
+                    }
+                    self.shot.destroy();
+                    world.removeBehavior(this);
+                    
+                    return;
+                }
+            }
+        },
+        behave: function (data) {
+            
+        }
+    };
+});
 
 // Converts from degrees to radians.
 Math.radians = function (degrees) {
@@ -69,7 +144,7 @@ function generatePlayers() {
     for (i = 0; i < yPos.length; i += 1) {
         yPos[i] = Math.floor((Math.random() * (fieldHeight - playerHeight - 2 * playerMargin))) + playerMargin;
     }
-    player1 = Physics.body('convex-polygon', {
+    player1 = Physics.body('player', {
         x: player1xPos + (playerWidth / 2),
         y: yPos[0] + (playerHeight / 2),
         mass: 0.1,
@@ -81,7 +156,7 @@ function generatePlayers() {
             { x:  player1xPos + playerWidth, y: yPos[0] }
         ]
     });
-    player2 = Physics.body('convex-polygon', {
+    player2 = Physics.body('player', {
         x: player2xPos + (playerWidth / 2),
         y: yPos[1] + (playerHeight / 2),
         fixed: true,
@@ -134,25 +209,27 @@ function generatePlanets() {
             y: newPlanetYPos,
             radius: newPlanetRadius,
             fixed: true,
-            mass: newPlanetRadius / 25
+            mass: newPlanetRadius / 15
         });
+        newPlanet.gameType = "planet";
         world.add(newPlanet);
     }
 }
 
 
 function shoot(power, angle) {
-    var newShoot;
+    var newShoot, shootBehaviour;
     $("#shootButton").off('click');
     newShoot = Physics.body('shot', {
-        x: playerMargin + playerWidth + (turn * (fieldWidth - 2 * playerWidth - 2 * playerMargin)),
+        x: ((playerMargin * 2) + playerWidth) + (turn * (fieldWidth - ((2 * playerWidth) + (5 * playerMargin)))),
         y: yPos[turn],
-        radius: 5,
-        mass: 0.5,
+        radius: 4,
+        mass: 2,
         vx: power * Math.cos(angle) * (1 - turn * 2),
         vy: power * Math.sin(angle)
     });
-    world.add(newShoot);
+    shootBehaviour = Physics.behavior('shot-behaviour', {shot: newShoot});
+    world.add([newShoot, shootBehaviour]);
     
     turn = (turn + 1) % 2;
     $("#shootButton").on('click', processShootClick);
@@ -160,7 +237,7 @@ function shoot(power, angle) {
 
 function processShootClick() {
     var shootPower = parseInt($("#power").val(), 10) / 75,
-        shootAngle = - Math.radians(parseInt($("#angle").val(), 10));
+        shootAngle = -Math.radians(parseInt($("#angle").val(), 10));
     shoot(shootPower, shootAngle);
 }
 
@@ -176,7 +253,7 @@ function restartGame() {
     world.add(Physics.behaviour('body-collision-detection'));
     world.add(Physics.behaviour('body-impulse-response'));
     world.add(renderer);
-    world.add(Physics.behavior('edge-collision-detection', {
+    world.add(Physics.behaviour('edge-collision-detection', {
         aabb: viewportBounds,
         restitution: 0.5,
         styles: {
