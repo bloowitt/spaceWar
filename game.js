@@ -26,7 +26,9 @@ var planetData = {},
     planPossibleFieldWidth = maxPlanXPos - minPlanXPos,
     turn = 0,
     planetCollection = [],
-    yPos = [1, 1];
+    playerArray = [],
+    yPos = [1, 1],
+    canvasClicked = false;
 
 // extend the circle body
 Physics.body('shot', 'circle', function (parent) {
@@ -49,7 +51,7 @@ Physics.body('player', 'convex-polygon', function (parent) {
             var pThis = this;
             parent.init.call(this, options);
             this.gameType = 'player';
-            
+            this.pastPower = 0;
             return this;
         },
         destroy: function () {
@@ -137,6 +139,8 @@ Physics.util.ticker.subscribe(
 );
 
 
+// We are pretty much hardcoding 2 player games and making it very difficult to change. 
+// Whatev, this is just learning
 function generatePlayers() {
     var player1,
         player2,
@@ -171,6 +175,8 @@ function generatePlayers() {
     });
     world.add(player1);
     world.add(player2);
+    playerArray.push(player1);
+    playerArray.push(player2);
 }
 
 function collision(xp, yp, rad) {
@@ -209,7 +215,7 @@ function generatePlanets() {
             y: newPlanetYPos,
             radius: newPlanetRadius,
             fixed: true,
-            mass: newPlanetRadius / 15
+            mass: newPlanetRadius / 5
         });
         newPlanet.gameType = "planet";
         world.add(newPlanet);
@@ -224,7 +230,7 @@ function shoot(power, angle) {
         x: ((playerMargin * 2) + playerWidth) + (turn * (fieldWidth - ((2 * playerWidth) + (5 * playerMargin)))),
         y: yPos[turn],
         radius: 4,
-        mass: 2,
+        mass: 0.5,
         vx: power * Math.cos(angle) * (1 - turn * 2),
         vy: power * Math.sin(angle)
     });
@@ -236,9 +242,23 @@ function shoot(power, angle) {
 }
 
 function processShootClick() {
-    var shootPower = parseInt($("#power").val(), 10) / 75,
-        shootAngle = -Math.radians(parseInt($("#angle").val(), 10));
+    var shootPower = playerArray[turn].pastDistance / 10,
+        shootAngle = playerArray[turn].angle;
     shoot(shootPower, shootAngle);
+}
+
+function mouseMove(event) {
+    // playerArray[turn] is current player
+    // We have to calculate angle to click point and distance. 
+    var horizDist = event.pageX - $("#gameCanvas").offset().left,
+        vertDist = event.pageY - $("#gameCanvas").offset().top,
+        distancePtP = Math.sqrt(Math.pow(horizDist, 2) + Math.pow(vertDist, 2)),
+        curPlayer = playerArray[turn],
+        angleToShoot = Math.atan2(vertDist, horizDist);
+    curPlayer.pastDistance = distancePtP;
+    curPlayer.state.angular.pos = angleToShoot;
+    $("#angle").val(angleToShoot);
+    $("#power").val(distancePtP);
 }
 
 function restartGame() {
@@ -263,10 +283,21 @@ function restartGame() {
     generatePlayers();
     generatePlanets();
     Physics.util.ticker.start();
+    $("#gameCanvas").on('mousedown', function () { 
+        $("#gameCanvas").on('mousemove', mouseMove);
+        canvasClicked = true;
+    });
+    $("body").on('mouseup', function () { 
+        $("#gameCanvas").off('mousemove');
+        canvasClicked = false;
+    });
+    $("body").on('keydown', function (event) {
+        if ( event.which === 32 ) {
+            processShootClick();
+        }
+    });
     $("#shootButton").on('click', processShootClick);
 }
-
-
 
 function redrawGame() {
     world.render();
